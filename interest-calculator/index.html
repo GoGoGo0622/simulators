@@ -64,11 +64,11 @@
       <div class="form-row" style="margin-bottom:12px;">
         <div class="form-group">
           <label>📅 이주비 시작일</label>
-          <input type="date" id="loanStartDate" value="2026-10-31" onchange="recalc()">
+          <input type="date" id="loanStartDate" value="2026-10-31" onchange="buildRateTable(); recalc()">
         </div>
         <div class="form-group">
           <label>🏁 입주 예정일</label>
-          <input type="date" id="moveInDate" value="2032-01-31" onchange="recalc()">
+          <input type="date" id="moveInDate" value="2032-01-31" onchange="buildRateTable(); recalc()">
           <span class="hint">⭐ 변경 시 전체 재계산</span>
         </div>
       </div>
@@ -268,10 +268,21 @@ function clampDate(d, lo, hi) {
   return x;
 }
 
+// ==================== YEAR RANGE HELPER ====================
+function getYearRange() {
+  const loanStart = SimEngine.parseDate(document.getElementById('loanStartDate').value);
+  const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
+  return {
+    start: loanStart.getFullYear(),
+    end: moveIn.getFullYear()
+  };
+}
+
 // ==================== BUILD RATE TABLE UI ====================
 function buildRateTable() {
-  const startY = 2026;
-  const endY = 2038;
+  const range = getYearRange();
+  const startY = range.start;
+  const endY = range.end;
   const defRate = parseFloat(document.getElementById('defaultRate').value) || 4.18;
   const container = document.getElementById('rateTableContainer');
 
@@ -295,8 +306,8 @@ function buildRateTable() {
 }
 
 function onRateChange() {
-  const startY = 2026; const endY = 2038;
-  for (let y = startY; y <= endY; y++) {
+  const range = getYearRange();
+  for (let y = range.start; y <= range.end; y++) {
     const jrEl = document.getElementById(`jr_${y}`);
     const lrEl = document.getElementById(`lr_${y}`);
     if (jrEl) jeongdoRates[y] = parseFloat(jrEl.value) / 100;
@@ -325,8 +336,9 @@ function recalc() {
   const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
   const jdAmount = parseInt(document.getElementById('jeongdoAmount').value.replace(/,/g,'')) || 0;
   const jdDates = getJeongdoDates();
-  const startY = 2026;
-  const endY = Math.max(moveIn.getFullYear(), 2032);
+  const range = getYearRange();
+  const startY = range.start;
+  const endY = range.end;
 
   // --- 이주비 단리 ---
   let loanInterest = 0;
@@ -675,7 +687,8 @@ function downloadCSV() {
   const loanPrincipal = parseInt(document.getElementById('loanPrincipal').value.replace(/,/g,'')) || 0;
   const loanStart = SimEngine.parseDate(document.getElementById('loanStartDate').value);
   const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
-  const startY = 2026; const endY = Math.max(moveIn.getFullYear(), 2032);
+  const range = getYearRange();
+  const startY = range.start; const endY = range.end;
 
   for (let y = startY; y <= endY; y++) {
     const ys = getYearStart(y); const ye = getYearEnd(y);

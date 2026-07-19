@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이자 계산기 — 아파트 이주비·중도금 시뮬레이터</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+  .split-panel { display: grid; grid-template-columns: 380px 1fr; gap: 24px; }
+  @media (max-width: 900px) { .split-panel { grid-template-columns: 1fr; } }
+  .rate-table input { width: 90px; text-align: right; }
+  .jeongdo-schedule .done { color: var(--text-muted); text-decoration: line-through; }
+  .summary-highlight { font-size: 28px; font-weight: 800; font-family: var(--font-mono); }
+  .summary-card { text-align: center; padding: 24px; }
+  .summary-card .icon { font-size: 32px; margin-bottom: 8px; }
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+  }
+  .tag-simple { background: var(--primary-light); color: var(--primary); }
+  .tag-compound { background: var(--warning-light); color: var(--warning); }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-loan { background: var(--primary); }
+  .dot-simple { background: var(--success); }
+  .dot-compound { background: var(--warning); }
+  canvas { max-width: 100%; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <a href="../index.html" class="logo">🧮 시뮬레이터</a>
+  <nav>
+    <a href="../index.html">← 허브</a>
+    <a href="#" onclick="SimEngine.copyShareURL(getParams())">🔗 공유</a>
+  </nav>
+</header>
+
+<div class="container">
+  <h1 style="font-size:22px;margin-bottom:4px;">💰 아파트 이주비·중도금 이자 계산기</h1>
+  <p style="color:var(--text-secondary);margin-bottom:24px;font-size:14px;">
+    이주비(단리) + 중도금(단리·복리) 통합 시뮬레이션. 모든 계산은 브라우저에서만 처리됩니다.
+  </p>
+
+<div class="split-panel">
+  <!-- LEFT: 입력 패널 -->
+  <div>
+  <div class="card">
+    <div class="card-header">📋 입력값</div>
+    <div class="card-body">
+
+      <!-- 이주비 -->
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>🏠 이주비 원금</label>
+        <input type="text" id="loanPrincipal" class="input-won" value="267000000" onchange="recalc()" placeholder="예: 267000000">
+        <span class="input-unit">원 (2.67억 = 267,000,000)</span>
+      </div>
+
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="form-group">
+          <label>📅 이주비 시작일</label>
+          <input type="date" id="loanStartDate" value="2026-10-31" onchange="recalc()">
+        </div>
+        <div class="form-group">
+          <label>🏁 입주 예정일</label>
+          <input type="date" id="moveInDate" value="2032-01-31" onchange="recalc()">
+          <span class="hint">⭐ 변경 시 전체 재계산</span>
+        </div>
+      </div>
+
+      <!-- 중도금 -->
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px;"></div>
+
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="form-group">
+          <label>📦 회차당 중도금</label>
+          <input type="text" id="jeongdoAmount" class="input-won" value="40000000" onchange="recalc()">
+          <span class="input-unit">원 (4,000만)</span>
+        </div>
+        <div class="form-group">
+          <label>🔄 발생 주기</label>
+          <select id="jeongdoInterval" onchange="recalc()">
+            <option value="6">6개월</option>
+            <option value="8" selected>8개월</option>
+            <option value="12">12개월</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>🔢 총 회차</label>
+          <input type="number" id="jeongdoCount" value="6" min="1" max="20" onchange="recalc()">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>📅 중도금 최초 발생일</label>
+        <input type="date" id="jeongdoStartDate" value="2028-01-31" onchange="recalc()">
+      </div>
+
+      <!-- 금리 -->
+      <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px;"></div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>📊 기본 금리 (연 %)</label>
+        <div class="form-row">
+          <input type="number" id="defaultRate" value="4.18" step="0.01" min="0" max="30" style="width:100px;" onchange="recalc()">
+          <span style="line-height:2.2;font-size:13px;color:var(--text-secondary);">% (연도별 개별 조정 가능)</span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>📋 연도별 금리 상세</label>
+        <div id="rateTableContainer" class="rate-table" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px;"></div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="recalc()">
+        🔄 계산하기
+      </button>
+      <button class="btn" style="width:100%;margin-top:8px;" onclick="resetAll()">
+        ↺ 기본값으로 초기화
+      </button>
+    </div>
+  </div>
+  </div>
+
+  <!-- RIGHT: 결과 -->
+  <div>
+    <!-- Summary Cards -->
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stat-card accent-primary summary-card">
+        <div class="icon">🏠</div>
+        <div class="stat-label">이주비 이자 (단리)</div>
+        <div class="stat-value" id="sumLoan">—</div>
+        <div class="stat-sub">이주비 금리 적용</div>
+      </div>
+      <div class="stat-card accent-success summary-card">
+        <div class="icon">📦</div>
+        <div class="stat-label">중도금 이자 (단리)</div>
+        <div class="stat-value" id="sumSimple">—</div>
+        <div class="stat-sub"><span class="tag tag-simple">단리</span></div>
+      </div>
+      <div class="stat-card accent-warning summary-card">
+        <div class="icon">📈</div>
+        <div class="stat-label">중도금 이자 (복리)</div>
+        <div class="stat-value" id="sumCompound">—</div>
+        <div class="stat-sub"><span class="tag tag-compound">복리</span></div>
+      </div>
+    </div>
+
+    <!-- Grand Total -->
+    <div class="card" style="margin-bottom:24px;text-align:center;padding:20px;">
+      <div style="display:flex;justify-content:center;gap:40px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);">🏠 총상환 (단리 기준)</div>
+          <div class="summary-highlight" id="grandSimple" style="color:var(--primary);">—</div>
+          <div style="font-size:11px;color:var(--text-muted);">이주비 + 중도금 단리</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);">🏠 총상환 (복리 기준)</div>
+          <div class="summary-highlight" id="grandCompound" style="color:var(--warning);">—</div>
+          <div style="font-size:11px;color:var(--text-muted);">이주비 + 중도금 복리</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('loan')">🏠 이주비 상세</button>
+      <button class="tab" onclick="switchTab('jeongdo-simple')">📦 중도금 단리</button>
+      <button class="tab" onclick="switchTab('jeongdo-compound')">📈 중도금 복리</button>
+      <button class="tab" onclick="switchTab('chart')">📊 차트</button>
+    </div>
+
+    <!-- Tab: Loan Detail -->
+    <div id="tab-loan" class="tab-content active">
+      <div class="card">
+        <div class="table-container" id="loanTableContainer"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Jeongdo Simple -->
+    <div id="tab-jeongdo-simple" class="tab-content">
+      <div class="card">
+        <div class="table-container" id="simpleTableContainer"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Jeongdo Compound -->
+    <div id="tab-jeongdo-compound" class="tab-content">
+      <div class="card">
+        <div class="legend">
+          <span><span class="dot dot-compound"></span> 노란색 배경 = 원리금 (Balance)</span>
+          <span>각 회차별 2행: 일수 / 원리금 / 이자</span>
+        </div>
+        <div class="table-container" id="compoundTableContainer"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Chart -->
+    <div id="tab-chart" class="tab-content">
+      <div class="card">
+        <div class="card-body">
+          <canvas id="interestChart" height="350"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share bar -->
+    <div class="actions-bar">
+      <button class="btn btn-primary" onclick="SimEngine.copyShareURL(getParams())">🔗 링크 복사해서 공유</button>
+      <button class="btn btn-sm" onclick="downloadCSV()">📥 CSV 다운로드</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script src="../shared/simulator-engine.js"></script>
+<script>
+// ==================== STATE ====================
+let loanRates = {};   // 연도별 이주비 금리
+let jeongdoRates = {}; // 연도별 중도금 금리
+
+// ==================== GET PARAMS ====================
+function getParams() {
+  return {
+    loan: parseInt(document.getElementById('loanPrincipal').value.replace(/,/g,'')) || 0,
+    loanDate: document.getElementById('loanStartDate').value,
+    moveIn: document.getElementById('moveInDate').value,
+    jdAmount: parseInt(document.getElementById('jeongdoAmount').value.replace(/,/g,'')) || 0,
+    jdInterval: parseInt(document.getElementById('jeongdoInterval').value),
+    jdCount: parseInt(document.getElementById('jeongdoCount').value),
+    jdDate: document.getElementById('jeongdoStartDate').value,
+    rate: parseFloat(document.getElementById('defaultRate').value)
+  };
+}
+
+// ==================== CALCULATE JEONGDO DATES ====================
+function addEndOfMonth(date, months) {
+  const d = new Date(date);
+  d.setDate(1);                         // 1일로 이동
+  d.setMonth(d.getMonth() + months);    // 목표 월의 1일
+  d.setMonth(d.getMonth() + 1);         // 다음 달 1일
+  d.setDate(0);                         // 목표 월의 마지막 날
+  return d;
+}
+
+function getJeongdoDates() {
+  const start = SimEngine.parseDate(document.getElementById('jeongdoStartDate').value);
+  const interval = parseInt(document.getElementById('jeongdoInterval').value);
+  const count = parseInt(document.getElementById('jeongdoCount').value);
+  const dates = [];
+  let d = new Date(start);
+  for (let i = 0; i < count; i++) {
+    dates.push(new Date(d));
+    d = addEndOfMonth(d, interval);
+  }
+  return dates;
+}
+
+function getYearEnd(y) { return new Date(y, 11, 31); }
+function getYearStart(y) { return new Date(y, 0, 1); }
+function clampDate(d, lo, hi) {
+  let x = new Date(Math.max(d.getTime(), lo.getTime()));
+  x = new Date(Math.min(x.getTime(), hi.getTime()));
+  return x;
+}
+
+// ==================== BUILD RATE TABLE UI ====================
+function buildRateTable() {
+  const startY = 2026;
+  const endY = 2038;
+  const defRate = parseFloat(document.getElementById('defaultRate').value) || 4.18;
+  const container = document.getElementById('rateTableContainer');
+
+  let html = '<table style="font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:center;">연도</th>';
+  html += '<th style="text-align:center;">중도금 금리 (%)</th>';
+  html += '<th style="text-align:center;">이주비 금리 (%)</th>';
+  html += '</tr></thead><tbody>';
+
+  for (let y = startY; y <= endY; y++) {
+    const jr = jeongdoRates[y] != null ? jeongdoRates[y] : defRate / 100;
+    const lr = loanRates[y] != null ? loanRates[y] : defRate / 100;
+    html += '<tr>';
+    html += `<td style="text-align:center;font-weight:600;">${y}</td>`;
+    html += `<td><input type="number" id="jr_${y}" value="${(jr*100).toFixed(3)}" step="0.001" min="0" max="30" onchange="onRateChange()"></td>`;
+    html += `<td><input type="number" id="lr_${y}" value="${(lr*100).toFixed(3)}" step="0.001" min="0" max="30" onchange="onRateChange()"></td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function onRateChange() {
+  const startY = 2026; const endY = 2038;
+  for (let y = startY; y <= endY; y++) {
+    const jrEl = document.getElementById(`jr_${y}`);
+    const lrEl = document.getElementById(`lr_${y}`);
+    if (jrEl) jeongdoRates[y] = parseFloat(jrEl.value) / 100;
+    if (lrEl) loanRates[y] = parseFloat(lrEl.value) / 100;
+  }
+  recalc();
+}
+
+function getLoanRate(y) {
+  if (loanRates[y] != null) return loanRates[y];
+  const def = parseFloat(document.getElementById('defaultRate').value) / 100;
+  return def;
+}
+
+function getJeongdoRate(y) {
+  if (jeongdoRates[y] != null) return jeongdoRates[y];
+  const def = parseFloat(document.getElementById('defaultRate').value) / 100;
+  return def;
+}
+
+// ==================== RECALCULATE ====================
+function recalc() {
+  // Read inputs
+  const loanPrincipal = parseInt(document.getElementById('loanPrincipal').value.replace(/,/g,'')) || 0;
+  const loanStart = SimEngine.parseDate(document.getElementById('loanStartDate').value);
+  const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
+  const jdAmount = parseInt(document.getElementById('jeongdoAmount').value.replace(/,/g,'')) || 0;
+  const jdDates = getJeongdoDates();
+  const startY = 2026;
+  const endY = Math.max(moveIn.getFullYear(), 2032);
+
+  // --- 이주비 단리 ---
+  let loanInterest = 0;
+  const loanRows = [];
+  for (let y = startY; y <= endY; y++) {
+    const ys = getYearStart(y);
+    const ye = getYearEnd(y);
+    const periodStart = clampDate(loanStart, ys, moveIn);
+    const periodEnd = clampDate(moveIn, ys, ye);
+    if (periodStart >= periodEnd) continue;
+
+    const days = SimEngine.daysBetween(periodStart, periodEnd);
+    if (days <= 0) continue;
+
+    const rate = getLoanRate(y);
+    const interest = SimEngine.simpleInterest(loanPrincipal, rate, periodStart, periodEnd);
+    loanInterest += interest;
+    loanRows.push({ year: y, start: periodStart, end: periodEnd, days, principal: loanPrincipal, rate, interest });
+  }
+
+  // --- 중도금 단리 ---
+  const simpleRows = [];  // per jeongdo, per year
+  const jdSimpleTotals = [];
+  let totalSimple = 0;
+  for (let ji = 0; ji < jdDates.length; ji++) {
+    const jd = jdDates[ji];
+    let instTotal = 0;
+    const yearRows = [];
+    for (let y = startY; y <= endY; y++) {
+      const ys = getYearStart(y);
+      const ye = getYearEnd(y);
+      const periodStart = clampDate(jd, ys, moveIn);
+      const periodEnd = clampDate(moveIn, ys, ye);
+      if (periodStart >= periodEnd) continue;
+
+      const days = SimEngine.daysBetween(periodStart, periodEnd);
+      if (days <= 0) continue;
+
+      const rate = getJeongdoRate(y);
+      const interest = SimEngine.simpleInterest(jdAmount, rate, periodStart, periodEnd);
+      instTotal += interest;
+      yearRows.push({ year: y, days, rate, interest });
+    }
+    totalSimple += instTotal;
+    simpleRows.push({ index: ji+1, date: jd, yearRows, total: instTotal });
+    jdSimpleTotals.push(instTotal);
+  }
+
+  // --- 중도금 복리 ---
+  const compoundRows = [];
+  let totalCompound = 0;
+  for (let ji = 0; ji < jdDates.length; ji++) {
+    const jd = jdDates[ji];
+    let balance = jdAmount;
+    let instTotal = 0;
+    const yearRows = [];
+    for (let y = startY; y <= endY; y++) {
+      const ys = getYearStart(y);
+      const ye = getYearEnd(y);
+      const periodStart = clampDate(jd, ys, moveIn);
+      const periodEnd = clampDate(moveIn, ys, ye);
+      if (periodStart >= periodEnd) continue;
+
+      const days = SimEngine.daysBetween(periodStart, periodEnd);
+      if (days <= 0) continue;
+
+      const rate = getJeongdoRate(y);
+      const prevBalance = balance;
+      balance = prevBalance * Math.pow(1 + rate, days / 365);
+      const interest = balance - prevBalance;
+      instTotal += interest;
+      yearRows.push({ year: y, days, rate, balance, interest, prevBalance });
+    }
+    totalCompound += instTotal;
+    compoundRows.push({ index: ji+1, date: jd, yearRows, total: instTotal, finalBalance: balance });
+  }
+
+  // ==================== RENDER ====================
+  // Summary
+  document.getElementById('sumLoan').textContent = SimEngine.formatWon(loanInterest) + '원';
+  document.getElementById('sumSimple').textContent = SimEngine.formatWon(totalSimple) + '원';
+  document.getElementById('sumCompound').textContent = SimEngine.formatWon(totalCompound) + '원';
+  document.getElementById('grandSimple').textContent = SimEngine.formatWon(loanInterest + totalSimple) + '원';
+  document.getElementById('grandCompound').textContent = SimEngine.formatWon(loanInterest + totalCompound) + '원';
+
+  // Loan table
+  let lh = '<table><thead><tr><th>연도</th><th>기간 시작</th><th>기간 종료</th><th>일수</th><th>원금</th><th>금리</th><th>이자</th></tr></thead><tbody>';
+  for (const r of loanRows) {
+    lh += `<tr>
+      <td>${r.year}</td><td>${SimEngine.formatDate(r.start)}</td><td>${SimEngine.formatDate(r.end)}</td>
+      <td>${r.days}</td><td>${SimEngine.formatWon(r.principal)}</td>
+      <td>${SimEngine.formatPct(r.rate)}</td><td style="color:var(--danger);">${SimEngine.formatWon(r.interest)}</td>
+    </tr>`;
+  }
+  lh += '</tbody><tfoot><tr><td colspan="6">합계</td><td style="color:var(--danger);">' + SimEngine.formatWon(loanInterest) + '</td></tr></tfoot></table>';
+  document.getElementById('loanTableContainer').innerHTML = lh;
+
+  // Simple table: one row per jeongdo, one column per year
+  const years = [];
+  for (let y = startY; y <= endY; y++) years.push(y);
+
+  let sh = '<table><thead><tr><th>회차</th><th>발생일</th><th>누적이자</th>';
+  for (const y of years) sh += `<th>${y}년</th>`;
+  sh += '</tr></thead><tbody>';
+
+  for (const sr of simpleRows) {
+    sh += `<tr><td style="font-weight:600;">${sr.index}회차</td><td>${SimEngine.formatDate(sr.date)}</td>`;
+    sh += `<td style="color:var(--danger);">${SimEngine.formatWon(sr.total)}</td>`;
+    for (const y of years) {
+      const yr = sr.yearRows.find(r => r.year === y);
+      sh += `<td>${yr ? SimEngine.formatWon(yr.interest) : '—'}</td>`;
+    }
+    sh += '</tr>';
+  }
+  // Sum row
+  sh += '<tfoot><tr><td colspan="2">연도별 합계</td><td style="color:var(--danger);">' + SimEngine.formatWon(totalSimple) + '</td>';
+  for (const y of years) {
+    let sum = 0;
+    for (const sr of simpleRows) {
+      const yr = sr.yearRows.find(r => r.year === y);
+      if (yr) sum += yr.interest;
+    }
+    sh += `<td>${SimEngine.formatWon(sum)}</td>`;
+  }
+  sh += '</tr></tfoot></table>';
+  document.getElementById('simpleTableContainer').innerHTML = sh;
+
+  // Compound table: 3 rows per jeongdo (일수 / 원리금 / 이자)
+  let ch = '<table><thead><tr><th>회차</th><th>발생일</th><th>구분</th><th>누적이자</th>';
+  for (const y of years) ch += `<th>${y}년</th>`;
+  ch += '</tr></thead><tbody>';
+
+  for (const cr of compoundRows) {
+    // Days row
+    ch += `<tr><td rowspan="3" style="font-weight:600;vertical-align:middle;">${cr.index}회차</td>`;
+    ch += `<td rowspan="3" style="vertical-align:middle;">${SimEngine.formatDate(cr.date)}</td>`;
+    ch += `<td style="font-size:10px;color:var(--text-muted);">일수</td>`;
+    ch += `<td rowspan="3" style="color:var(--danger);vertical-align:middle;">${SimEngine.formatWon(cr.total)}</td>`;
+    for (const y of years) {
+      const yr = cr.yearRows.find(r => r.year === y);
+      ch += `<td style="background:var(--bg-secondary);font-size:11px;">${yr ? yr.days : '—'}</td>`;
+    }
+    ch += '</tr>';
+
+    // Balance row
+    ch += '<tr>';
+    ch += '<td style="font-size:10px;color:var(--text-muted);">원리금</td>';
+    for (const y of years) {
+      const yr = cr.yearRows.find(r => r.year === y);
+      ch += `<td style="background:#fff3cd;">${yr ? SimEngine.formatWon(yr.balance) : '—'}</td>`;
+    }
+    ch += '</tr>';
+
+    // Interest row
+    ch += '<tr>';
+    ch += '<td style="font-size:10px;color:var(--text-muted);">이자</td>';
+    for (const y of years) {
+      const yr = cr.yearRows.find(r => r.year === y);
+      ch += `<td>${yr ? SimEngine.formatWon(yr.interest) : '—'}</td>`;
+    }
+    ch += '</tr>';
+  }
+  ch += '</tbody></table>';
+  document.getElementById('compoundTableContainer').innerHTML = ch;
+
+  // Chart
+  drawChart(years, jdSimpleTotals, compoundRows, loanRows);
+
+  // Save to URL
+  SimEngine.saveToURL(getParams());
+}
+
+// ==================== CHART ====================
+function drawChart(years, jdSimpleTotals, compoundRows, loanRows) {
+  const canvas = document.getElementById('interestChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.parentElement.clientWidth - 40;
+  const H = 350;
+  canvas.width = W;
+  canvas.height = H;
+
+  const pad = { top: 20, right: 20, bottom: 60, left: 80 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+
+  // Aggregate by year
+  const yearData = {};
+  for (const y of years) yearData[y] = { loan: 0, simple: 0, compound: 0 };
+
+  for (const r of loanRows) yearData[r.year].loan += r.interest;
+  for (const cr of compoundRows) {
+    for (const yr of cr.yearRows) yearData[yr.year].compound += yr.interest;
+  }
+  // Simple per year
+  for (const y of years) {
+    for (const cr of compoundRows) {
+      const yr = cr.yearRows.find(r => r.year === y);
+      // We need simple interest per year - recalc
+    }
+  }
+  // Use simpleRows aggregated
+  const allSimpleRows = [];
+  for (const y of years) {
+    let sum = 0;
+    const jdDates = getJeongdoDates();
+    const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
+    const jdAmount = parseInt(document.getElementById('jeongdoAmount').value.replace(/,/g,'')) || 0;
+    for (const jd of jdDates) {
+      const ys = getYearStart(y);
+      const ye = getYearEnd(y);
+      const ps = clampDate(jd, ys, moveIn);
+      const pe = clampDate(moveIn, ys, ye);
+      if (ps < pe) {
+        const rate = getJeongdoRate(y);
+        sum += SimEngine.simpleInterest(jdAmount, rate, ps, pe);
+      }
+    }
+    yearData[y].simple = sum;
+  }
+
+  const activeYears = years.filter(y => {
+    const d = yearData[y];
+    return (d.loan + d.simple + d.compound) > 0;
+  });
+
+  if (activeYears.length === 0) { ctx.clearRect(0, 0, W, H); return; }
+
+  let maxVal = 0;
+  for (const y of activeYears) {
+    const d = yearData[y];
+    maxVal = Math.max(maxVal, d.loan + d.simple + d.compound);
+  }
+  maxVal *= 1.15;
+
+  // Background
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-card').trim();
+  ctx.fillRect(0, 0, W, H);
+
+  const barGap = Math.max(4, Math.min(20, pw / activeYears.length * 0.25));
+  const barW = (pw - barGap * (activeYears.length - 1)) / activeYears.length;
+
+  // Grid
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border').trim();
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const v = maxVal * i / 5;
+    const y = pad.top + ph - (v / maxVal * ph);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-secondary').trim();
+    ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = 'right';
+    ctx.fillText(SimEngine.formatWon(v), pad.left - 8, y + 4);
+  }
+
+  // Bars
+  const colors = {
+    loan: getComputedStyle(document.body).getPropertyValue('--primary').trim(),
+    simple: getComputedStyle(document.body).getPropertyValue('--success').trim(),
+    compound: getComputedStyle(document.body).getPropertyValue('--warning').trim()
+  };
+
+  for (let i = 0; i < activeYears.length; i++) {
+    const y = activeYears[i];
+    const d = yearData[y];
+    const x = pad.left + i * (barW + barGap);
+    let baseY = pad.top + ph;
+
+    // Stacked: loan → simple → compound
+    const segments = [
+      { val: d.loan, color: colors.loan },
+      { val: d.simple, color: colors.simple },
+      { val: d.compound, color: colors.compound }
+    ];
+
+    for (const seg of segments) {
+      if (seg.val <= 0) continue;
+      const h = (seg.val / maxVal) * ph;
+      ctx.fillStyle = seg.color;
+      ctx.fillRect(x, baseY - h, barW, h);
+      baseY -= h;
+    }
+
+    // Year label
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-secondary').trim();
+    ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = 'center';
+    ctx.fillText(y, x + barW / 2, pad.top + ph + 20);
+  }
+
+  // Legend
+  const legendY = pad.top + ph + 45;
+  const legendItems = [
+    { label: '이주비', color: colors.loan },
+    { label: '중도금 단리', color: colors.simple },
+    { label: '중도금 복리', color: colors.compound }
+  ];
+  let lx = pad.left;
+  for (const li of legendItems) {
+    ctx.fillStyle = li.color;
+    ctx.fillRect(lx, legendY, 12, 12);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim();
+    ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = 'left';
+    ctx.fillText(li.label, lx + 16, legendY + 11);
+    lx += ctx.measureText(li.label).width + 36;
+  }
+}
+
+// ==================== TAB SWITCH ====================
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  // Find button and activate
+  const tabs = document.querySelectorAll('.tab');
+  const map = { 'loan': 0, 'jeongdo-simple': 1, 'jeongdo-compound': 2, 'chart': 3 };
+  if (map[name] != null) tabs[map[name]].classList.add('active');
+
+  if (name === 'chart') setTimeout(() => recalc(), 100);
+}
+
+// ==================== RESET ====================
+function resetAll() {
+  document.getElementById('loanPrincipal').value = '267000000';
+  document.getElementById('loanStartDate').value = '2026-10-31';
+  document.getElementById('moveInDate').value = '2032-01-31';
+  document.getElementById('jeongdoAmount').value = '40000000';
+  document.getElementById('jeongdoInterval').value = '8';
+  document.getElementById('jeongdoCount').value = '6';
+  document.getElementById('jeongdoStartDate').value = '2028-01-31';
+  document.getElementById('defaultRate').value = '4.18';
+  loanRates = {};
+  jeongdoRates = {};
+  buildRateTable();
+  recalc();
+  SimEngine.showToast('↺ 기본값으로 초기화되었습니다');
+}
+
+// ==================== CSV DOWNLOAD ====================
+function downloadCSV() {
+  const rows = [['Category','Year','Days','Principal','Rate','Interest']];
+  const loanPrincipal = parseInt(document.getElementById('loanPrincipal').value.replace(/,/g,'')) || 0;
+  const loanStart = SimEngine.parseDate(document.getElementById('loanStartDate').value);
+  const moveIn = SimEngine.parseDate(document.getElementById('moveInDate').value);
+  const startY = 2026; const endY = Math.max(moveIn.getFullYear(), 2032);
+
+  for (let y = startY; y <= endY; y++) {
+    const ys = getYearStart(y); const ye = getYearEnd(y);
+    const ps = clampDate(loanStart, ys, moveIn);
+    const pe = clampDate(moveIn, ys, ye);
+    if (ps >= pe) continue;
+    const days = SimEngine.daysBetween(ps, pe);
+    if (days <= 0) continue;
+    const rate = getLoanRate(y);
+    const interest = SimEngine.simpleInterest(loanPrincipal, rate, ps, pe);
+    rows.push(['이주비', y, days, loanPrincipal, SimEngine.formatPct(rate, 5), Math.round(interest)]);
+  }
+
+  const jdDates = getJeongdoDates();
+  const jdAmount = parseInt(document.getElementById('jeongdoAmount').value.replace(/,/g,'')) || 0;
+  for (let ji = 0; ji < jdDates.length; ji++) {
+    const jd = jdDates[ji];
+    for (let y = startY; y <= endY; y++) {
+      const ys = getYearStart(y); const ye = getYearEnd(y);
+      const ps = clampDate(jd, ys, moveIn);
+      const pe = clampDate(moveIn, ys, ye);
+      if (ps >= pe) continue;
+      const days = SimEngine.daysBetween(ps, pe);
+      if (days <= 0) continue;
+      const rate = getJeongdoRate(y);
+      const interest = SimEngine.simpleInterest(jdAmount, rate, ps, pe);
+      rows.push([`중도금_${ji+1}회차_단리`, y, days, jdAmount, SimEngine.formatPct(rate, 5), Math.round(interest)]);
+    }
+  }
+
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'interest_calculator.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  SimEngine.showToast('📥 CSV 다운로드 완료');
+}
+
+// ==================== INIT ====================
+function init() {
+  // Load from URL params if present
+  const params = SimEngine.loadFromURL();
+  if (params.loan) document.getElementById('loanPrincipal').value = params.loan;
+  if (params.loanDate) document.getElementById('loanStartDate').value = params.loanDate;
+  if (params.moveIn) document.getElementById('moveInDate').value = params.moveIn;
+  if (params.jdAmount) document.getElementById('jeongdoAmount').value = params.jdAmount;
+  if (params.jdInterval) document.getElementById('jeongdoInterval').value = params.jdInterval;
+  if (params.jdCount) document.getElementById('jeongdoCount').value = params.jdCount;
+  if (params.jdDate) document.getElementById('jeongdoStartDate').value = params.jdDate;
+  if (params.rate) document.getElementById('defaultRate').value = params.rate;
+
+  buildRateTable();
+  recalc();
+}
+
+window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('resize', () => {
+  if (document.getElementById('tab-chart').classList.contains('active')) {
+    drawChart();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시뮬레이터 허브</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 24px;
+  }
+  .sim-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    transition: all var(--transition);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text);
+    display: block;
+  }
+  .sim-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+  }
+  .sim-card .icon { font-size: 36px; margin-bottom: 12px; }
+  .sim-card .title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .sim-card .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .sim-card .tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+  }
+  .tag-active { background: var(--success-light); color: var(--success); }
+  .tag-planned { background: var(--warning-light); color: var(--warning); }
+  .tag-idea { background: var(--primary-light); color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <span class="logo">🧮 시뮬레이터 허브</span>
+  <nav>
+    <span style="font-size:13px;color:var(--text-secondary);">모든 계산은 브라우저에서만 처리됩니다 🔒</span>
+  </nav>
+</header>
+
+<div class="container">
+  <h1 style="font-size:22px;margin-bottom:4px;">📊 시뮬레이터 모음</h1>
+  <p style="color:var(--text-secondary);margin-bottom:24px;font-size:14px;">
+    입력값을 바꿔가며 시뮬레이션해보세요. 링크를 공유하면 같은 설정으로 다른 사람도 볼 수 있습니다.<br>
+    <strong>보안:</strong> 모든 데이터는 브라우저 내에서만 처리되며 외부로 전송되지 않습니다.
+  </p>
+
+  <div class="hub-grid">
+
+    <!-- Active simulators -->
+    <a href="interest-calculator/index.html" class="sim-card">
+      <div class="icon">💰</div>
+      <div class="title">이주비·중도금 이자 계산기</div>
+      <div class="desc">아파트 이주비 대출과 중도금 대출의 이자를 단리·복리로 계산합니다. 연도별 금리를 개별 설정할 수 있습니다.</div>
+      <div class="tags">
+        <span class="tag tag-active">🚀 사용 가능</span>
+        <span class="tag tag-active">단리</span>
+        <span class="tag tag-active">복리</span>
+      </div>
+    </a>
+
+    <!-- Planned simulators -->
+    <div class="sim-card" style="opacity:0.6;cursor:default;">
+      <div class="icon">🏗️</div>
+      <div class="title">리모델링 비용 시뮬레이터</div>
+      <div class="desc">아파트 리모델링 시 필요 현금, 대출 가능액, 월 상환액을 시뮬레이션합니다. (준비 중)</div>
+      <div class="tags">
+        <span class="tag tag-planned">🔜 예정</span>
+      </div>
+    </div>
+
+    <div class="sim-card" style="opacity:0.6;cursor:default;">
+      <div class="icon">🏦</div>
+      <div class="title">대출 비교 시뮬레이터</div>
+      <div class="desc">여러 대출 상품의 금리, 기간, 상환 방식을 비교 분석합니다. (준비 중)</div>
+      <div class="tags">
+        <span class="tag tag-planned">🔜 예정</span>
+      </div>
+    </div>
+
+    <div class="sim-card" style="opacity:0.6;cursor:default;">
+      <div class="icon">📈</div>
+      <div class="title">투자 수익 시뮬레이터</div>
+      <div class="desc">정기 적금, 주식, ETF 등 투자 시나리오별 예상 수익을 계산합니다. (준비 중)</div>
+      <div class="tags">
+        <span class="tag tag-idea">💡 아이디어</span>
+      </div>
+    </div>
+
+  </div>
+
+  <hr style="border-color:var(--border);margin:32px 0;">
+
+  <h2 style="font-size:18px;margin-bottom:12px;">🔒 보안 & 개인정보</h2>
+  <div class="card" style="padding:20px;">
+    <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;">
+      <li>✅ 모든 계산은 <strong>클라이언트(브라우저)에서만</strong> 실행됩니다.</li>
+      <li>✅ 입력한 금액, 날짜, 금리 등 어떤 데이터도 <strong>서버로 전송되지 않습니다.</strong></li>
+      <li>✅ 외부 API 호출이 없습니다. (JavaScript 라이브러리 로드 없음)</li>
+      <li>✅ <strong>GitHub Pages</strong>로 호스팅 시 HTTPS가 기본 적용됩니다.</li>
+      <li>✅ URL 파라미터로 공유할 수 있으며, URL에 포함된 정보는 브라우저 주소창에만 존재합니다.</li>
+      <li>⚠️ URL을 공유하면 입력값이 노출됩니다. 민감한 실제 데이터는 공유 시 주의하세요.</li>
+    </ul>
+  </div>
+
+  <hr style="border-color:var(--border);margin:32px 0;">
+
+  <h2 style="font-size:18px;margin-bottom:12px;">🚀 배포 방법</h2>
+  <div class="card" style="padding:20px;">
+    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:12px;">
+      이 시뮬레이터는 순수 정적 파일(HTML/CSS/JS)로만 구성되어 있어 어떤 정적 호스팅에도 배포할 수 있습니다.
+    </p>
+    <div style="background:var(--bg-secondary);border-radius:var(--radius);padding:16px;font-family:var(--font-mono);font-size:13px;">
+      <div style="margin-bottom:8px;font-weight:600;"># GitHub Pages (권장)</div>
+      <div style="color:var(--text-secondary);">
+        cd /Volumes/Hun/Test/simulators<br>
+        git init && git add -A && git commit -m "Simulators v1"<br>
+        git remote add origin https://github.com/USER/simulators.git<br>
+        git push -u origin main<br>
+        <span style="color:var(--text-muted);"># Settings → Pages → Source: main branch → / (root) → Save</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
